@@ -35,7 +35,7 @@ jobs:
                       continue
                       
                   # Split by double-dash notation
-                  parts = re.split(r'--', name)
+                  parts = re.split(r'-[-‐‒–—―]+', name)
                   
                   # Navigate the hierarchy and create nodes as needed
                   current = hierarchy
