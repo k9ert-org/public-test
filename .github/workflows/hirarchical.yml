@@ -48,7 +48,7 @@ jobs:
                           if part not in current:
                               current[part] = {}
                           current = current[part]
-              
+              print(hierarchy)
               return hierarchy
 
           # Function to generate sidebar markdown recursively
@@ -92,6 +92,7 @@ jobs:
           # Write to _Sidebar.md
           with open('_Sidebar.md', 'w') as f:
               f.write('\n'.join(sidebar_lines))
+          print(sidebar_lines)
           EOF
           
           python3 sidebar_generator.py
