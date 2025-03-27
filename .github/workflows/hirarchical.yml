@@ -69,9 +69,11 @@ jobs:
                   # If this node has a file, link to it
                   if isinstance(value, dict) and '__file' in value:
                       file_name = value['__file']
+                      print(indent + "page:" + file_name)
                       lines.append(f'{indent}* [{display_name}]({file_name})')
                   else:
                       # This is just a category header
+                      print(indent + "category:" + display_name)
                       lines.append(f'{indent}* **{display_name}**')
                   
                   # Recursively process children (excluding the __file entry)
