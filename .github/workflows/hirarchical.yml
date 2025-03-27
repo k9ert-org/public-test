@@ -1,0 +1,105 @@
+name: Generate Recursive Wiki Sidebar
+
+on:
+  gollum:  # Triggered when wiki is updated
+  workflow_dispatch:  # Allow manual triggering
+  schedule:
+    - cron: '0 0 * * *'  # Run daily at midnight
+
+jobs:
+  generate-sidebar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout wiki
+        uses: actions/checkout@v3
+        with:
+          repository: ${{ github.repository }}.wiki
+          token: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Generate recursive sidebar
+        run: |
+          cat > sidebar_generator.py << 'EOF'
+          import os
+          import re
+
+          # Get all markdown files
+          md_files = [f for f in os.listdir('.') if f.endswith('.md') and not f.startswith('_')]
+
+          # Function to build a nested dictionary representing the hierarchy
+          def build_hierarchy(files):
+              hierarchy = {}
+              
+              for file in files:
+                  name = file[:-3]  # Remove .md extension
+                  if name == 'Home':
+                      continue
+                      
+                  # Split by double-dash notation
+                  parts = re.split(r'--', name)
+                  
+                  # Navigate the hierarchy and create nodes as needed
+                  current = hierarchy
+                  for i, part in enumerate(parts):
+                      if i == len(parts) - 1:
+                          # Last part - this is a page
+                          current[part] = {'__file': name}
+                      else:
+                          # Directory part
+                          if part not in current:
+                              current[part] = {}
+                          current = current[part]
+              
+              return hierarchy
+
+          # Function to generate sidebar markdown recursively
+          def generate_sidebar_md(hierarchy, level=0):
+              lines = []
+              
+              # Sort keys alphabetically but put entries with '__file' first
+              def sort_key(item):
+                  key, value = item
+                  if isinstance(value, dict) and '__file' in value:
+                      return (0, key)
+                  return (1, key)
+              
+              for key, value in sorted(hierarchy.items(), key=sort_key):
+                  indent = '  ' * level
+                  display_name = key.replace('-', ' ')
+                  
+                  # If this node has a file, link to it
+                  if isinstance(value, dict) and '__file' in value:
+                      file_name = value['__file']
+                      lines.append(f'{indent}* [{display_name}]({file_name})')
+                  else:
+                      # This is just a category header
+                      lines.append(f'{indent}* **{display_name}**')
+                  
+                  # Recursively process children (excluding the __file entry)
+                  if isinstance(value, dict):
+                      child_dict = {k: v for k, v in value.items() if k != '__file'}
+                      if child_dict:
+                          lines.extend(generate_sidebar_md(child_dict, level + 1))
+              
+              return lines
+
+          # Build the hierarchy
+          hierarchy = build_hierarchy(md_files)
+
+          # Generate the sidebar content
+          sidebar_lines = ['### Wiki Navigation', '', '* [Home](Home)']
+          sidebar_lines.extend(generate_sidebar_md(hierarchy))
+
+          # Write to _Sidebar.md
+          with open('_Sidebar.md', 'w') as f:
+              f.write('\n'.join(sidebar_lines))
+          EOF
+          
+          python3 sidebar_generator.py
+          
+      - name: Commit and push changes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add _Sidebar.md
+          git diff --quiet && git diff --staged --quiet || git commit -m "Update recursive wiki sidebar"
+          git push
